@@ -18,6 +18,11 @@ namespace CSparse
         public const int SizeOfDouble = sizeof(double);
 
         /// <summary>
+        /// The size of a single in bytes
+        /// </summary>
+        public const int SizeOfSingle = sizeof(float);
+
+        /// <summary>
         /// The default threshold used for matrix values comparision.
         /// </summary>
         public const double EqualsThreshold = 1e-12;
