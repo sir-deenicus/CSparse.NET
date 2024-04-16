@@ -5,6 +5,55 @@
     using System;
     using System.Diagnostics;
     using System.Threading.Tasks;
+   
+    /// <summary>
+    /// Defines the operations of a semiring.
+    /// </summary>
+    public interface ITropicalSemiring
+    {
+        /// <summary>
+        /// Addition operation of two elements of the semiring (in this case, either min or max).
+        /// </summary>
+        /// <param name="a">The first element.</param>
+        /// <param name="b">The second element.</param>
+        /// <returns>The result of the addition operation.</returns>
+        float Extremum(float a, float b);
+
+        /// <summary>
+        /// Gets the additive identity of the semiring.
+        /// </summary>
+        float AdditiveIdentity { get; }
+    }
+
+    /// <summary>
+    /// Represents the min-plus semiring.
+    /// </summary>
+    public class MinSemiring : ITropicalSemiring
+    {
+        /// <inheritdoc />
+        public float Extremum(float a, float b)
+        {
+            return Math.Min(a, b);
+        }
+
+        /// <inheritdoc />
+        public float AdditiveIdentity => float.PositiveInfinity; //since the minimum of any number and infinity is the number itself
+    }
+
+    /// <summary>
+    /// Represents the max-plus semiring.
+    /// </summary>
+    public class MaxSemiring : ITropicalSemiring
+    {
+        /// <inheritdoc />
+        public float Extremum(float a, float b)
+        {
+            return Math.Max(a, b);
+        }
+
+        /// <inheritdoc />
+        public float AdditiveIdentity => float.NegativeInfinity; //since the maximum of any number and negative infinity is the number itself
+    }  
 
     /// <inheritdoc />
     [DebuggerDisplay("TropicalSparseMatrix {RowCount}x{ColumnCount}-Single {NonZerosCount}-NonZero")]
@@ -14,17 +63,31 @@
         /// <summary>
         /// Initializes a new instance of the <see cref="TropicalSparseMatrix"/> class.
         /// </summary>
-        public TropicalSparseMatrix(int rowCount, int columnCount)
+        private ITropicalSemiring semiring;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TropicalSparseMatrix"/> class.
+        /// </summary>
+        /// <param name="semiring">The semiring to be used for matrix operations.</param>
+        /// <param name="rowCount">The number of rows in the matrix.</param>
+        /// <param name="columnCount">The number of columns in the matrix.</param>
+        public TropicalSparseMatrix(ITropicalSemiring semiring, int rowCount, int columnCount)
             : base(rowCount, columnCount)
         {
+            this.semiring = semiring;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TropicalSparseMatrix"/> class.
         /// </summary>
-        public TropicalSparseMatrix(int rowCount, int columnCount, int valueCount)
+        /// <param name="semiring">The semiring to be used for matrix operations.</param>
+        /// <param name="rowCount">The number of rows in the matrix.</param>
+        /// <param name="columnCount">The number of columns in the matrix.</param>
+        /// <param name="valueCount">The number of non-zero values in the matrix.</param>
+        public TropicalSparseMatrix(ITropicalSemiring semiring, int rowCount, int columnCount, int valueCount)
             : base(rowCount, columnCount, valueCount)
         {
+            this.semiring = semiring;
         }
 
         /// <summary>
@@ -99,13 +162,13 @@
         /// <inheritdoc />
         public override double L1Norm()
         {
-            double norm = double.PositiveInfinity;
+            double norm = semiring.AdditiveIdentity;
 
             for (int j = 0; j < columns; j++)
             {
                 for (int i = ColumnPointers[j]; i < ColumnPointers[j + 1]; i++)
-                {
-                    norm = Math.Min(norm, Values[i]);
+                { 
+                    norm = semiring.Extremum((float)norm, Values[i]);
                 }
             }
 
@@ -134,23 +197,23 @@
             var ax = Values;
             var ap = ColumnPointers;
             var ai = RowIndices;
-
-            // Initialize y with positive infinity.
+ 
+            // Initialize y with infinity. 
             for (int i = 0; i < rows; i++)
-            {
-                y[i] = float.PositiveInfinity;
+            { 
+                y[i] = semiring.AdditiveIdentity;
             }
 
             int end;
-
+ 
             for (int j = 0; j < columns; j++)
             {
                 end = ap[j + 1];
 
                 // Loop over the rows.
                 for (int k = ap[j]; k < end; k++)
-                { 
-                    y[ai[k]] = Math.Min(y[ai[k]], x[j] + ax[k]);
+                {  
+                    y[ai[k]] = semiring.Extremum(y[ai[k]], x[j] + ax[k]);
                 }
             }
         }
@@ -161,7 +224,7 @@
             var ax = Values;
             var ap = ColumnPointers;
             var ai = RowIndices;
-            
+             
             for (int j = 0; j < rows; j++)
             {
                 y[j] = beta + y[j];
@@ -169,7 +232,7 @@
 
             int end;
             float xi;
-
+ 
             for (int i = 0; i < columns; i++)
             { 
                 xi = alpha + x[i];
@@ -177,8 +240,8 @@
                 end = ap[i + 1];
 
                 for (int k = ap[i]; k < end; k++)
-                { 
-                    y[ai[k]] = Math.Min(y[ai[k]], ax[k] + xi);
+                {  
+                    y[ai[k]] = semiring.Extremum(y[ai[k]], ax[k] + xi);
                 }
             }
         }
@@ -191,15 +254,15 @@
             var ai = RowIndices;
 
             float yi;
-
+ 
             for (int i = 0; i < columns; i++)
             {
-                yi = float.PositiveInfinity;
+                yi = semiring.AdditiveIdentity;
 
                 // Compute the tropical inner product of row i with vector x
                 for (int k = ap[i]; k < ap[i + 1]; k++)
-                { 
-                    yi = Math.Min(yi, ax[k] + x[ai[k]]);
+                {  
+                    yi = semiring.Extremum(yi, ax[k] + x[ai[k]]);
                 }
 
                 // Store result in y(i) 
@@ -217,7 +280,7 @@
             float yi;
 
             int end, start = ap[0];
-
+ 
             for (int i = 0; i < columns; i++)
             {
                 end = ap[i + 1];
@@ -225,7 +288,7 @@
                 yi = beta + y[i];
                 for (int k = start; k < end; k++)
                 { 
-                    yi = Math.Min(yi, alpha + ax[k] + x[ai[k]]);
+                    yi = semiring.Extremum(yi, alpha + ax[k] + x[ai[k]]);
                 }
                 y[i] = yi;
 
@@ -444,7 +507,7 @@
                 if (bnz2 != 0)
                 {
                     indices[nresults] = start;
-                    results[nresults++] = new TropicalSparseMatrix(m, end - start, anz + bnz2);
+                    results[nresults++] = new TropicalSparseMatrix(semiring, m, end - start, anz + bnz2);
                 }
             }
             Parallel.For(0, nresults, options,
@@ -584,8 +647,8 @@
                 {
                     j = RowIndices[p]; // A(i,j) is nonzero
                     if (marker[j] >= q)
-                    {
-                        Values[marker[j]] = Math.Min(Values[marker[j]], Values[p]); // A(i,j) is a duplicate
+                    { 
+                        Values[marker[j]] = semiring.Extremum(Values[marker[j]], Values[p]); // A(i,j) is a duplicate
                     }
                     else
                     {
@@ -644,8 +707,8 @@
                     cj[nz++] = i; // add i to pattern of C(:,j)
                 }
                 else
-                {
-                    x[i] = Math.Min(x[i], beta + Values[p]); // i exists in C(:,j) already (tropical addition)
+                { 
+                    x[i] = semiring.Extremum(x[i], beta + Values[p]); // i exists in C(:,j) already (tropical addition)
                 }
             }
 
